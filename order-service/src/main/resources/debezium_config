@@ -1,0 +1,36 @@
+ALTER ROLE DB_USER WITH REPLICATION;
+
+ALTER ROLE DB_USER WITH LOGIN;
+
+SELECT * FROM pg_replication_slots;
+
+CREATE PUBLICATION order_outbox_event_publication
+FOR TABLE order_schema.order_outbox_event;
+
+Post Request on http://localhost:8083/connectors
+with body
+{
+  "name": "outbox-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+
+    "database.hostname": "host.docker.internal",
+    "database.port": "5432",
+    "database.user": "DB_USER",
+    "database.password": "DB_PASSWORD",
+    "database.dbname": "order_service_db",
+
+    "topic.prefix": "dbserver1",
+
+    "table.include.list": "order_schema.order_outbox_event",
+
+    "plugin.name": "pgoutput",
+
+    "publication.name": "order_outbox_event_publication",
+    "publication.autocreate.mode": "disabled",
+
+    "slot.name": "dbz_orders_slot"
+  }
+
+  To delete connector -> Delete request on http://localhost:8083/connectors/outbox-connector
+}
