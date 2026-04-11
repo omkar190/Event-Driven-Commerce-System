@@ -19,6 +19,7 @@ public class OrderController {
 
     @PostMapping("/orders")
     public Mono<Order> create(@Valid @RequestBody Order order){
+        System.out.println("Just a check.");
         return orderService.createOrder(order);
     }
 
