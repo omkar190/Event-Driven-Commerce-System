@@ -121,6 +121,10 @@ class OrderRepositoryTest {
         order.setCreatedAt(LocalDateTime.now());
 
         StepVerifier.create(repository.insertOrder(order))
+                .expectNext(order)
+                .verifyComplete();
+
+        StepVerifier.create(repository.insertOrder(order))
                 .expectError()
                 .verify();
 
