@@ -1,28 +1,66 @@
 export default function HomePage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white px-6">
-      <div className="text-center max-w-2xl">
-        {/* Main Card */}
-        <div className="rounded-3xl p-10 bg-white/10 backdrop-blur-lg border border-white/20 shadow-2xl">
-          <h1 className="text-5xl font-bold mb-4">
-            Order Service Dashboard
-          </h1>
+    <div style={styles.container}>
+      <div style={styles.card}>
+        <h1 style={styles.title}>Order Service 🚀</h1>
+        <p style={styles.subtitle}>Backend is up and running.</p>
 
-          <p className="text-lg text-slate-300 mb-6">
-            A simple backend service home page
-          </p>
+        <div style={styles.divider} />
 
-          {/* Message */}
-          <div className="inline-block px-6 py-3 rounded-full bg-black/30 border border-white/10 text-green-300 font-medium">
-            Order Service is up and running 🚀
-          </div>
-        </div>
-
-        {/* Footer */}
-        <p className="mt-6 text-sm text-slate-400">
-          Built for internal backend monitoring
+        <p style={styles.message}>
+          Use <span style={styles.highlight}>/orders</span> API to interact with
+          the system.
         </p>
+
+        <p style={styles.footer}>Built for performance. Designed for scale.</p>
       </div>
     </div>
   );
 }
+
+const styles = {
+  container: {
+    height: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    background: "linear-gradient(135deg, #0f172a, #1e293b)",
+    fontFamily: "system-ui, sans-serif",
+  },
+  card: {
+    background: "#0f172a",
+    padding: "40px 50px",
+    borderRadius: "20px",
+    boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
+    textAlign: "center",
+    border: "1px solid rgba(255,255,255,0.05)",
+  },
+  title: {
+    fontSize: "36px",
+    marginBottom: "10px",
+    color: "#38bdf8",
+  },
+  subtitle: {
+    fontSize: "16px",
+    color: "#94a3b8",
+    marginBottom: "20px",
+  },
+  divider: {
+    height: "1px",
+    background: "rgba(255,255,255,0.1)",
+    margin: "20px 0",
+  },
+  message: {
+    fontSize: "18px",
+    color: "#e2e8f0",
+  },
+  highlight: {
+    color: "#22c55e",
+    fontWeight: "bold",
+  },
+  footer: {
+    marginTop: "20px",
+    fontSize: "14px",
+    color: "#64748b",
+  },
+};
