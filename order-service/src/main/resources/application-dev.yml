@@ -1,5 +1,9 @@
 spring:
   r2dbc:
+    pool:
+      initial-size: 1
+      max-size: 3
+      max-idle-time: 30s
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}

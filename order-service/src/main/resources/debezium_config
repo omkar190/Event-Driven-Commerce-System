@@ -14,10 +14,10 @@ with body
   "config": {
     "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
 
-    "database.hostname": "host.docker.internal",
-    "database.port": "5432",
-    "database.user": "DB_USER",
-    "database.password": "DB_PASSWORD",
+    "database.hostname": "",
+    "database.port": "",
+    "database.user": "",
+    "database.password": "",
     "database.dbname": "order_service_db",
 
     "topic.prefix": "dbserver1",
@@ -29,8 +29,10 @@ with body
     "publication.name": "order_outbox_event_publication",
     "publication.autocreate.mode": "disabled",
 
-    "slot.name": "dbz_orders_slot"
+    "slot.name": "dbz_orders_slot",
+    "tombstones.on.delete": "false"
   }
+}
 
   To delete connector -> Delete request on http://localhost:8083/connectors/outbox-connector
 }
