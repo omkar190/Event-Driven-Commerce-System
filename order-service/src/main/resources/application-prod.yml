@@ -12,9 +12,7 @@ spring:
     init:
       mode: always
 
-  kafka:
-    bootstrap-servers: localhost:9092
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
-      acks: all
+  rabbitmq:
+    addresses: ${CLOUDAMQP_URL}
+    publisher-confirm-type: correlated
+    publisher-returns: true

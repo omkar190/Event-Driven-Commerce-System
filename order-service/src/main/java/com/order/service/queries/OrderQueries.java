@@ -10,4 +10,7 @@ public class OrderQueries {
                 RETURNING id, user_id, status, amount, created_at
                 """;
 
+    public static final String UPDATE_STATUS = """
+                UPDATE order_schema.orders SET status = 'SENT' WHERE id = :id
+                """;
 }

@@ -11,4 +11,7 @@ public class OutboxQueries {
                         (:id, :aggregateType, :aggregateId, :eventType, :payload, :status, :createdAt)
                         """;
 
+    public static final String UPDATE_STATUS = """
+                UPDATE order_schema.order_outbox_event SET status = 'SENT' WHERE id = :id
+                """;
 }
