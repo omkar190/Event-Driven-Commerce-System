@@ -1,10 +1,15 @@
-name: CI and Render Deploy
+name: Order Service Deploy
 
 on:
   pull_request:
+    paths:
+      - 'order-service/**'
+
   push:
     branches:
       - main
+    paths:
+      - 'order-service/**'
 
 jobs:
   test:
