@@ -22,18 +22,20 @@ public class AuthController {
 
     @PostMapping("/signup")
     public Mono<ResponseEntity<AuthResponse>> signUp(@RequestBody AuthRequest request) {
-        return authService.signUp(request.getEmail(), request.getPassword())
+        return authService.signUp(request.getEmail(), request.getPassword(),request.getCountryCode(), request.getMobileNumber())
                 .map(user -> ResponseEntity.status(HttpStatus.CREATED)
                         .body(new AuthResponse(
                                 user.getId(),
                                 user.getEmail(),
                                 user.getRole(),
-                                "Account created successfully"
+                                "Account created successfully",
+                                user.getCountryCode(),
+                                user.getMobileNumber()
                         ))
                 )
                 .onErrorResume(e -> Mono.just(
                         ResponseEntity.badRequest()
-                                .body(new AuthResponse(null, null, null, e.getMessage()))
+                                .body(new AuthResponse(null, null, null, e.getMessage(), null, null))
                 ));
     }
 
@@ -45,12 +47,14 @@ public class AuthController {
                                 user.getId(),
                                 user.getEmail(),
                                 user.getRole(),
-                                "Login successful"
+                                "Login successful",
+                                user.getCountryCode(),
+                                user.getMobileNumber()
                         ))
                 )
                 .onErrorResume(e -> Mono.just(
                         ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                                .body(new AuthResponse(null, null, null, e.getMessage()))
+                                .body(new AuthResponse(null, null, null, e.getMessage(), null, null))
                 ));
     }
 }

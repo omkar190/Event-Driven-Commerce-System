@@ -1,10 +1,13 @@
 package com.order.service.services;
 
+import com.order.service.dto.OrderRequest;
 import com.order.service.entities.Order;
 import com.order.service.repositories.OrderRepository;
+import com.order.service.repositories.ProductRepository;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -12,16 +15,38 @@ import java.util.UUID;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final ProductRepository productRepository;
 
-    public OrderService(OrderRepository orderRepository){
+    public OrderService(OrderRepository orderRepository, ProductRepository productRepository){
         this.orderRepository = orderRepository;
+        this.productRepository = productRepository;
     }
 
-    public Mono<Order> createOrder(Order order){
-        order.setStatus("CREATED");
-        order.setId(UUID.randomUUID().toString().replace("-",""));
-        order.setCreatedAt(LocalDateTime.now());
-        return orderRepository.insertOrder(order);
+    public Mono<Order> createOrder(OrderRequest request){
+        return productRepository.findById(request.getProductId())
+                .switchIfEmpty(Mono.error(new RuntimeException("Product not found")))
+                .flatMap(product -> {
+                    if (product.getAvailableQty() < request.getQuantity()) {
+                        return Mono.error(new RuntimeException(
+                                "Insufficient stock. Available: " + product.getAvailableQty()));
+                    }
+
+                    BigDecimal amount = product.getSellingPrice()
+                            .multiply(BigDecimal.valueOf(request.getQuantity()));
+
+                    Order order = new Order();
+                    order.setId(String.valueOf(UUID.randomUUID()));
+                    order.setUserId(request.getUserId());
+                    order.setProductId(request.getProductId());
+                    order.setQuantity(request.getQuantity());
+                    order.setAmount(amount);
+                    order.setAddress(request.getAddress());
+                    order.setStatus("CREATED");
+                    order.setCreatedAt(LocalDateTime.now());
+                    order.setMobileNumber(request.getMobileNumber());
+
+                    return orderRepository.insertOrder(order);
+                });
     }
 
 }

@@ -23,6 +23,8 @@ public class UserRepositoryImpl implements UserRepository {
                 .bind("id", user.getId())
                 .bind("email", user.getEmail())
                 .bind("password", user.getPassword())
+                .bind("countryCode", user.getCountryCode())
+                .bind("mobileNumber", user.getMobileNumber())
                 .bind("role", user.getRole())
                 .bind("isActive", user.isActive())
                 .bind("createdAt", user.getCreatedAt())

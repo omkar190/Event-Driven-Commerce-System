@@ -17,13 +17,13 @@ public class AuthService {
         this.passwordEncoder = new BCryptPasswordEncoder();
     }
 
-    public Mono<User> signUp(String email, String password) {
+    public Mono<User> signUp(String email, String password, String countryCode, String mobileNumber) {
         return userRepository.existsByEmail(email)
                 .flatMap(exists -> {
                     if (exists) {
                         return Mono.error(new RuntimeException("Email already exists"));
                     }
-                    User user = new User(email, passwordEncoder.encode(password));
+                    User user = new User(email, passwordEncoder.encode(password), countryCode, mobileNumber);
                     return userRepository.save(user);
                 });
     }

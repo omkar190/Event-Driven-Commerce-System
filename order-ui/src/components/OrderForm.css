@@ -13,6 +13,7 @@
     system-ui,
     -apple-system,
     sans-serif;
+  padding: 40px 20px;
 }
 
 /* ── Animated background blobs ── */
@@ -69,7 +70,7 @@
 .order-card {
   position: relative;
   z-index: 1;
-  width: 420px;
+  width: 460px;
   padding: 40px;
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.05);
@@ -84,7 +85,7 @@
 /* ── Header ── */
 .card-header {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 28px;
 }
 
 .card-icon {
@@ -115,7 +116,7 @@
 
 /* ── Form ── */
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .form-label {
@@ -141,6 +142,11 @@
   transition: color 0.2s;
 }
 
+.textarea-icon {
+  top: 16px;
+  transform: none;
+}
+
 .form-input {
   width: 100%;
   padding: 14px 14px 14px 44px;
@@ -164,12 +170,90 @@
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
 }
 
-.form-input:focus ~ .input-icon,
 .input-wrapper:focus-within .input-icon {
   color: #6366f1;
 }
 
-/* Remove number input arrows */
+/* ── Read-only fields ── */
+.readonly {
+  background: rgba(255, 255, 255, 0.02) !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+/* ── Amount highlight ── */
+.amount-highlight {
+  font-weight: 700;
+  font-size: 18px !important;
+  color: #22c55e !important;
+  letter-spacing: 0.02em;
+}
+
+/* ── Select dropdown ── */
+.form-select {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  padding-right: 40px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+}
+
+.form-select option {
+  background: #1a1a2e;
+  color: #ffffff;
+  padding: 12px;
+}
+
+/* ── Textarea ── */
+.form-textarea {
+  resize: vertical;
+  min-height: 80px;
+  padding-top: 14px;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+/* ── Product Info Chips ── */
+.product-info {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.info-chip {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: center;
+}
+
+.info-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.info-value {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  color: #22c55e;
+}
+
+.low-stock {
+  color: #ef4444 !important;
+}
+
+/* ── Number input arrows ── */
 .form-input[type="number"]::-webkit-inner-spin-button,
 .form-input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
@@ -229,7 +313,7 @@
   }
 }
 
-/* ── Toast Notification ── */
+/* ── Toast ── */
 .toast {
   position: fixed;
   top: 24px;
@@ -292,9 +376,60 @@
 }
 
 /* ── Responsive ── */
-@media (max-width: 480px) {
+@media (max-width: 520px) {
   .order-card {
-    width: 90%;
-    padding: 28px;
+    width: 95%;
+    padding: 24px;
   }
+
+  .product-info {
+    flex-direction: column;
+  }
+}
+
+/* ── Phone Input Row ── */
+.phone-input-row {
+  display: flex;
+  gap: 10px;
+}
+
+.country-code-wrapper {
+  flex-shrink: 0;
+  width: 120px;
+}
+
+.country-code-select {
+  width: 100%;
+  padding: 14px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #ffffff;
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: all 0.25s ease;
+  box-sizing: border-box;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 24px;
+}
+
+.country-code-select:focus {
+  border-color: #6366f1;
+  background-color: rgba(99, 102, 241, 0.06);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.country-code-select option {
+  background: #1a1a2e;
+  color: #ffffff;
+  padding: 8px;
+}
+
+.mobile-input-wrapper {
+  flex: 1;
 }

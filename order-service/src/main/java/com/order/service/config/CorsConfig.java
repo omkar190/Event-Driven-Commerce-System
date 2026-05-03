@@ -19,7 +19,7 @@ public class CorsConfig {
                 "http://localhost:3000",
                 "https://order-ui-y50d.onrender.com"
         ));
-        config.setAllowedMethods(List.of("POST", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
 

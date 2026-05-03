@@ -1,12 +1,37 @@
 import { useState } from "react";
 import "./AuthPage.css";
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+
+const COUNTRY_CODES = [
+  { code: "+1", country: "US" },
+  { code: "+44", country: "UK" },
+  { code: "+91", country: "IN" },
+  { code: "+61", country: "AU" },
+  { code: "+81", country: "JP" },
+  { code: "+49", country: "DE" },
+  { code: "+33", country: "FR" },
+  { code: "+86", country: "CN" },
+  { code: "+82", country: "KR" },
+  { code: "+971", country: "UAE" },
+  { code: "+65", country: "SG" },
+  { code: "+55", country: "BR" },
+  { code: "+52", country: "MX" },
+  { code: "+39", country: "IT" },
+  { code: "+34", country: "ES" },
+  { code: "+7", country: "RU" },
+  { code: "+27", country: "ZA" },
+  { code: "+234", country: "NG" },
+  { code: "+62", country: "ID" },
+  { code: "+60", country: "MY" },
+];
 
 export default function AuthPage({ onLogin }) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [countryCode, setCountryCode] = useState("+91");
+  const [mobile, setMobile] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
@@ -29,15 +54,28 @@ export default function AuthPage({ onLogin }) {
       return;
     }
 
+    if (!isLogin && (!mobile.trim() || mobile.trim().length < 10)) {
+      showToast("error", "Please enter a valid mobile number");
+      return;
+    }
+
     setLoading(true);
 
     const endpoint = isLogin ? "/auth/login" : "/auth/signup";
+    const body = isLogin
+      ? { email: email.trim(), password }
+      : {
+          email: email.trim(),
+          password,
+          countryCode,
+          mobileNumber: mobile.trim(),
+        };
 
     try {
       const res = await fetch(`${BASE_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -45,14 +83,13 @@ export default function AuthPage({ onLogin }) {
       if (res.ok) {
         showToast("success", data.message || "Success!");
         if (isLogin && onLogin) {
-          // Pass user data to parent
           setTimeout(() => onLogin(data), 1000);
         }
         if (!isLogin) {
-          // Switch to login after successful signup
           setTimeout(() => {
             setIsLogin(true);
             setPassword("");
+            setMobile("");
           }, 1500);
         }
       } else {
@@ -67,12 +104,10 @@ export default function AuthPage({ onLogin }) {
 
   return (
     <div className="auth-page">
-      {/* Background */}
       <div className="auth-blob auth-blob-1" />
       <div className="auth-blob auth-blob-2" />
       <div className="auth-blob auth-blob-3" />
 
-      {/* Toast */}
       {toast && (
         <div className={`auth-toast auth-toast-${toast.type}`}>
           <span className="auth-toast-icon">
@@ -82,7 +117,6 @@ export default function AuthPage({ onLogin }) {
         </div>
       )}
 
-      {/* Card */}
       <form className="auth-card" onSubmit={handleSubmit}>
         <div className="auth-header">
           <div className="auth-icon">
@@ -111,7 +145,6 @@ export default function AuthPage({ onLogin }) {
           </p>
         </div>
 
-        {/* Toggle */}
         <div className="auth-toggle">
           <button
             type="button"
@@ -119,6 +152,7 @@ export default function AuthPage({ onLogin }) {
             onClick={() => {
               setIsLogin(true);
               setPassword("");
+              setMobile("");
             }}
           >
             Login
@@ -129,6 +163,7 @@ export default function AuthPage({ onLogin }) {
             onClick={() => {
               setIsLogin(false);
               setPassword("");
+              setMobile("");
             }}
           >
             Sign Up
@@ -235,6 +270,56 @@ export default function AuthPage({ onLogin }) {
             </button>
           </div>
         </div>
+
+        {/* Mobile Number - Only on Sign Up */}
+        {!isLogin && (
+          <div className="auth-form-group">
+            <label className="auth-label">Mobile Number</label>
+            <div className="phone-input-row">
+              <div className="country-code-wrapper">
+                <select
+                  className="country-code-select"
+                  value={countryCode}
+                  onChange={(e) => setCountryCode(e.target.value)}
+                >
+                  {COUNTRY_CODES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.country} {c.code}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="auth-input-wrapper mobile-input-wrapper">
+                <svg
+                  className="auth-input-icon"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                  <line x1="12" y1="18" x2="12.01" y2="18" />
+                </svg>
+                <input
+                  className="auth-input"
+                  type="tel"
+                  placeholder="9876543210"
+                  maxLength={10}
+                  value={mobile}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, "");
+                    setMobile(val);
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Submit */}
         <button

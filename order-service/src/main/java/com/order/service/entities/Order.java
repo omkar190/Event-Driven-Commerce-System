@@ -10,7 +10,9 @@ import org.springframework.data.annotation.Transient;
 import org.springframework.data.annotation.Version;
 import org.springframework.data.relational.core.mapping.Table;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -25,9 +27,13 @@ public class Order {
 
     private String status;
 
-    @NotNull
-    @Positive
-    private Double amount;
+    private UUID productId;
+    private int quantity;
+    private String address;
+
+    private BigDecimal amount;
+
+    private String mobileNumber;
 
     private LocalDateTime createdAt;
 }

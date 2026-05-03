@@ -1,5 +1,3 @@
-DROP SCHEMA order_schema CASCADE;
-
 CREATE SCHEMA IF NOT EXISTS order_schema;
 
 CREATE TABLE IF NOT EXISTS order_schema.users (

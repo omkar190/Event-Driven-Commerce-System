@@ -4,6 +4,7 @@ import com.order.service.config.RabbitMQConfig;
 import com.order.service.entities.Order;
 import com.order.service.mapper.OrderRowMapper;
 import com.order.service.queries.OrderQueries;
+import com.order.service.queries.ProductQueries;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
@@ -38,18 +39,48 @@ public class OrderRepositoryImpl implements CustomOrderRepository {
             {
               "orderId": "%s",
               "userId": "%s",
-              "amount": %s
+              "productId": "%s",
+              "quantity": %d,
+              "amount": %s,
+              "address": "%s",
+              "mobileNumber": "%s"
             }
-            """.formatted(order.getId(), order.getUserId(), order.getAmount());
+            """.formatted(
+                order.getId(),
+                order.getUserId(),
+                order.getProductId(),
+                order.getQuantity(),
+                order.getAmount(),
+                order.getAddress(),
+                order.getMobileNumber()
+        );
 
         Mono<Void> txFlow = databaseClient.sql(OrderQueries.INSERT)
                 .bind("id", order.getId())
                 .bind("userId", order.getUserId())
-                .bind("status", order.getStatus())
+                .bind("productId", order.getProductId())
+                .bind("quantity", order.getQuantity())
                 .bind("amount", order.getAmount())
+                .bind("address", order.getAddress())
+                .bind("status", order.getStatus())
                 .bind("createdAt", order.getCreatedAt())
+                .bind("mobileNumber", order.getMobileNumber())
                 .then()
-
+                .then(
+                        databaseClient.sql(ProductQueries.REDUCE_STOCK)
+                                .bind("id", order.getProductId())
+                                .bind("quantity", order.getQuantity())
+                                .fetch()
+                                .rowsUpdated()
+                                .flatMap(rowsUpdated -> {
+                                    if (rowsUpdated == 0) {
+                                        return Mono.error(
+                                                new RuntimeException("Insufficient stock or product not found")
+                                        );
+                                    }
+                                    return Mono.empty();
+                                })
+                )
                 .then(
                         databaseClient.sql(OutboxQueries.INSERT)
                                 .bind("id", eventId)
@@ -57,7 +88,7 @@ public class OrderRepositoryImpl implements CustomOrderRepository {
                                 .bind("aggregateId", order.getId())
                                 .bind("eventType", "ORDER_CREATED")
                                 .bind("payload", payload)
-                                .bind("status", "PENDING")
+                                .bind("status", "CREATED")
                                 .bind("createdAt", LocalDateTime.now())
                                 .then()
                 );
