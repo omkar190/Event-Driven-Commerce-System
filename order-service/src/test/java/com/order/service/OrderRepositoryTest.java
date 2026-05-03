@@ -9,6 +9,7 @@ import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.test.context.ActiveProfiles;
 import reactor.test.StepVerifier;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -31,7 +32,7 @@ class OrderRepositoryTest {
         order.setId(orderId);
         order.setUserId("testUser");
         order.setStatus("CREATED");
-        order.setAmount(100.0);
+        order.setAmount(BigDecimal.valueOf(100.0));
         order.setCreatedAt(LocalDateTime.now());
 
         // ACT
@@ -83,7 +84,7 @@ class OrderRepositoryTest {
         order.setId(orderId);
         order.setUserId("testUser");
         order.setStatus("CREATED");
-        order.setAmount(100.0);
+        order.setAmount(BigDecimal.valueOf(100.0));
         order.setCreatedAt(LocalDateTime.now());
 
         StepVerifier.create(repository.insertOrderFail(order))
@@ -117,7 +118,7 @@ class OrderRepositoryTest {
         order.setId("23482129945e4ca88c8a45d962960639"); // force unique violation
         order.setUserId("testUser");
         order.setStatus("CREATED");
-        order.setAmount(100.0);
+        order.setAmount(BigDecimal.valueOf(100.0));
         order.setCreatedAt(LocalDateTime.now());
 
         StepVerifier.create(repository.insertOrder(order))
