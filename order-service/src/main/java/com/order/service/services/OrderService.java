@@ -16,14 +16,16 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final ProductCacheService productCacheService;
 
-    public OrderService(OrderRepository orderRepository, ProductRepository productRepository){
+    public OrderService(OrderRepository orderRepository, ProductRepository productRepository, ProductCacheService productCacheService){
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
+        this.productCacheService = productCacheService;
     }
 
     public Mono<Order> createOrder(OrderRequest request){
-        return productRepository.findById(request.getProductId())
+        return productCacheService.getProductById(request.getProductId())
                 .switchIfEmpty(Mono.error(new RuntimeException("Product not found")))
                 .flatMap(product -> {
                     if (product.getAvailableQty() < request.getQuantity()) {
@@ -45,7 +47,12 @@ public class OrderService {
                     order.setCreatedAt(LocalDateTime.now());
                     order.setMobileNumber(request.getMobileNumber());
 
-                    return orderRepository.insertOrder(order);
+                    return orderRepository.insertOrder(order)
+                            // Evict cache after order placed (stock changed)
+                            .flatMap(savedOrder ->
+                                    productCacheService.evictProductCache(request.getProductId())
+                                            .thenReturn(savedOrder)
+                            );
                 });
     }
 

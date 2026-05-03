@@ -32,11 +32,20 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      rabbitmq:
+        image: rabbitmq:3.13
+        ports:
+          - 5672:5672
+
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
 
     env:
-      DB_URL: r2dbc:postgresql://localhost:5432/order_service_db?schema=order_schema
-      DB_USERNAME: order_service_user
-      DB_PASSWORD: password
+      DEV_DB_URL: r2dbc:postgresql://localhost:5432/order_service_db?schema=order_schema
+      DEV_DB_USERNAME: order_service_user
+      DEV_DB_PASSWORD: password
       SPRING_PROFILES_ACTIVE: test
 
     steps:

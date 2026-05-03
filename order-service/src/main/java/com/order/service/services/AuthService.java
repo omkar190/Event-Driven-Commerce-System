@@ -10,10 +10,12 @@ import reactor.core.publisher.Mono;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final UserCacheService userCacheService;
     private final BCryptPasswordEncoder passwordEncoder;
 
-    public AuthService(UserRepository userRepository) {
+    public AuthService(UserRepository userRepository,  UserCacheService userCacheService) {
         this.userRepository = userRepository;
+        this.userCacheService = userCacheService;
         this.passwordEncoder = new BCryptPasswordEncoder();
     }
 
@@ -29,7 +31,7 @@ public class AuthService {
     }
 
     public Mono<User> login(String email, String password) {
-        return userRepository.findByEmail(email)
+        return userCacheService.findByEmail(email)
                 .switchIfEmpty(Mono.error(new RuntimeException("User not found")))
                 .flatMap(user -> {
                     if (!user.isActive()) {
