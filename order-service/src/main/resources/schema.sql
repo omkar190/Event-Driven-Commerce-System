@@ -20,3 +20,12 @@ CREATE TABLE IF NOT EXISTS order_schema.order_outbox_event (
 
 CREATE INDEX IF NOT EXISTS idx_order_outbox_status_created
 ON order_schema.order_outbox_event(status, created_at);
+
+CREATE TABLE IF NOT EXISTS order_schema.users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL DEFAULT 'USER',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
