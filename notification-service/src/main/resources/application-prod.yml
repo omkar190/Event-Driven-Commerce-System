@@ -1,5 +1,6 @@
-rabbitmq:
-  addresses: ${CLOUDAMQP_URL}
+spring:
+  rabbitmq:
+    addresses: ${CLOUDAMQP_URL}
 
 resend:
   api:
