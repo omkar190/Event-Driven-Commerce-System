@@ -29,3 +29,7 @@ spring:
       redis:
         time-to-live: 600000
         cache-null-values: false
+
+app:
+  features:
+    otp-enabled: true

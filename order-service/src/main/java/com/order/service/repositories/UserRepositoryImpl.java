@@ -48,4 +48,15 @@ public class UserRepositoryImpl implements UserRepository {
                 .one()
                 .map(count -> count > 0);
     }
+
+    @Override
+    public Mono<Void> activateUser(String email) {
+        return databaseClient.sql("""
+                    UPDATE order_schema.users
+                    SET is_active = TRUE
+                    WHERE email = :email
+                    """)
+                .bind("email", email)
+                .then();
+    }
 }

@@ -14,6 +14,8 @@ public class RabbitMQConfig {
     public static final String ORDER_ROUTING_KEY = "order.created";
     public static final String ORDER_DLX = "orders.dlx";
     public static final String ORDER_DL_QUEUE = "orders.dead-letter-queue";
+    public static final String NOTIFICATION_EXCHANGE = "notification.exchange";
+    public static final String NOTIFICATION_ROUTING_KEY = "notification.otp";
 
     @Bean
     public DirectExchange orderExchange() {
@@ -59,5 +61,10 @@ public class RabbitMQConfig {
         RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
         rabbitTemplate.setMandatory(true);
         return rabbitTemplate;
+    }
+
+    @Bean
+    public DirectExchange notificationExchange() {
+        return new DirectExchange(NOTIFICATION_EXCHANGE, true, false);
     }
 }

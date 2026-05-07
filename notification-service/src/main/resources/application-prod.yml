@@ -1,0 +1,8 @@
+rabbitmq:
+  addresses: ${CLOUDAMQP_URL}
+
+resend:
+  api:
+    key: ${RESEND_API_KEY}
+  from:
+    email: ${RESEND_FROM_EMAIL}
