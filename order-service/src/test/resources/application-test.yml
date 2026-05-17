@@ -7,3 +7,7 @@ spring:
   sql:
     init:
       mode: always
+
+stripe:
+  secret:
+    key: sk_test_dummy
