@@ -151,7 +151,7 @@ class OrderRepositoryTest {
     @Test
     void shouldRollback_whenDatabaseConstraintFails() {
 
-        String orderId = "23482129945e4ca88c8a45d962960639";
+        String orderId = UUID.randomUUID().toString().replace("-", "");
         Order order = buildOrder(orderId);
 
         // First insert should succeed

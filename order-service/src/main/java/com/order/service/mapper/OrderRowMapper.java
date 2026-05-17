@@ -16,7 +16,7 @@ public class OrderRowMapper implements BiFunction<Row, Object, Order> {
         Order order = new Order();
         order.setId(row.get("id", String.class));
         order.setUserId(row.get("user_id", String.class));
-        order.setProductId(UUID.fromString(row.get("product_id", UUID.class).toString()));
+        order.setProductId(row.get("product_id", UUID.class));
         order.setQuantity(row.get("quantity", Integer.class));
         order.setAmount(row.get("amount", BigDecimal.class));
         order.setAddress(row.get("address", String.class));

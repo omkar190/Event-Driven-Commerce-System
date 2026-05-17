@@ -4,7 +4,7 @@ public class OrderQueries {
 
     public static final String INSERT = """
             INSERT INTO order_schema.orders (id, user_id, product_id, quantity, amount, address, mobile_number, status, created_at, stripe_client_secret)
-            VALUES (:id, :userId, :productId::uuid, :quantity, :amount, :address, :mobileNumber, :status, :createdAt, :stripeClientSecret)
+            VALUES (:id, :userId, :productId, :quantity, :amount, :address, :mobileNumber, :status, :createdAt, :stripeClientSecret)
             """;
 
     public static final String UPDATE_STATUS = """
