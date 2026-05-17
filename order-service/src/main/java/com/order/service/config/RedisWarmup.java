@@ -1,6 +1,7 @@
 package com.order.service.config;
 
-import jakarta.annotation.PostConstruct;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
@@ -16,10 +17,11 @@ public class RedisWarmup {
         this.reactiveRedisTemplate = reactiveRedisTemplate;
     }
 
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     public void warmup() {
 
         try {
+
             reactiveRedisTemplate.getConnectionFactory()
                     .getReactiveConnection()
                     .ping()
@@ -32,7 +34,8 @@ public class RedisWarmup {
                     .subscribe();
 
         } catch (Exception e) {
-            System.out.println("Warmup exception: " + e.getMessage());
+
+            System.out.println("Redis startup warmup exception: " + e.getMessage());
         }
     }
 }
