@@ -33,3 +33,7 @@ spring:
 app:
   features:
     otp-enabled: true
+
+stripe:
+  secret:
+    key: ${STRIPE_SECRET_KEY}
