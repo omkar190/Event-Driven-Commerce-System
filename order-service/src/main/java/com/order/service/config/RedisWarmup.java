@@ -3,6 +3,9 @@ package com.order.service.config;
 import jakarta.annotation.PostConstruct;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+
+import java.time.Duration;
 
 @Component
 public class RedisWarmup {
@@ -15,11 +18,21 @@ public class RedisWarmup {
 
     @PostConstruct
     public void warmup() {
-        reactiveRedisTemplate.getConnectionFactory()
-                .getReactiveConnection()
-                .ping()
-                .doOnSuccess(result -> System.out.println("Redis connection warmed up: " + result))
-                .doOnError(e -> System.err.println("Redis warmup failed: " + e.getMessage()))
-                .subscribe();
+
+        try {
+            reactiveRedisTemplate.getConnectionFactory()
+                    .getReactiveConnection()
+                    .ping()
+                    .timeout(Duration.ofSeconds(5))
+                    .doOnSuccess(result ->
+                            System.out.println("Redis warmed up: " + result))
+                    .doOnError(error ->
+                            System.out.println("Redis warmup failed: " + error.getMessage()))
+                    .onErrorResume(e -> Mono.empty())
+                    .subscribe();
+
+        } catch (Exception e) {
+            System.out.println("Warmup exception: " + e.getMessage());
+        }
     }
 }
