@@ -1,6 +1,7 @@
 package com.notification.service.consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.notification.service.dto.OrderNotificationEvent;
 import com.notification.service.dto.OtpNotificationEvent;
 import com.notification.service.service.EmailService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -32,4 +33,21 @@ public class NotificationConsumer {
             System.err.println("Failed to parse OTP event: " + e.getMessage());
         }
     }
+
+    @RabbitListener(queues = "notification.order.queue")
+    public void handleOrderNotification(String payload) {
+        try {
+            OrderNotificationEvent event =
+                    objectMapper.readValue(payload, OrderNotificationEvent.class);
+
+            System.out.println("Received order notification for: " + event.getEmail()
+                    + " | Type: " + event.getType());
+
+            emailService.sendOrderEmail(event);
+
+        } catch (Exception e) {
+            System.err.println("Failed to parse order event: " + e.getMessage());
+        }
+    }
+
 }

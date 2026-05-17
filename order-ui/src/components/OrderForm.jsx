@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import "./OrderForm.css";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+const STRIPE_KEY = import.meta.env.VITE_STRIPE_KEY || "pk_test_xxxxxx";
 
 const COUNTRY_CODES = [
   { code: "+1", country: "US" },
@@ -26,6 +27,20 @@ const COUNTRY_CODES = [
   { code: "+60", country: "MY" },
 ];
 
+const loadStripe = () => {
+  return new Promise((resolve) => {
+    if (window.Stripe) {
+      resolve(window.Stripe(STRIPE_KEY));
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://js.stripe.com/v3/";
+    script.onload = () => resolve(window.Stripe(STRIPE_KEY));
+    script.onerror = () => resolve(null);
+    document.body.appendChild(script);
+  });
+};
+
 export default function OrderForm({ user }) {
   const [products, setProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -35,6 +50,14 @@ export default function OrderForm({ user }) {
   const [mobile, setMobile] = useState(user?.mobileNumber || "");
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
+
+  // Stripe payment modal state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [stripe, setStripe] = useState(null);
+  const [cardElement, setCardElement] = useState(null);
+  const [currentOrder, setCurrentOrder] = useState(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paid, setPaid] = useState(false);
 
   const showToast = (type, message) => {
     setToast({ type, message });
@@ -48,6 +71,38 @@ export default function OrderForm({ user }) {
       .catch(() => showToast("error", "Failed to load products"));
   }, []);
 
+  // Mount Stripe card element when modal opens
+  useEffect(() => {
+    if (showPaymentModal && stripe) {
+      const elements = stripe.elements();
+      const card = elements.create("card", {
+        style: {
+          base: {
+            fontSize: "16px",
+            color: "#1e1b4b",
+            fontFamily: "Arial, sans-serif",
+            "::placeholder": { color: "#a5b4fc" },
+          },
+          invalid: { color: "#ef4444" },
+        },
+      });
+
+      // Mount after small delay to ensure DOM is ready
+      setTimeout(() => {
+        const container = document.getElementById("stripe-card-element");
+        if (container) {
+          card.mount("#stripe-card-element");
+          setCardElement(card);
+        }
+      }, 100);
+
+      return () => {
+        card.unmount();
+        setCardElement(null);
+      };
+    }
+  }, [showPaymentModal, stripe]);
+
   const handleProductChange = (e) => {
     const productId = e.target.value;
     const product = products.find((p) => p.id === productId);
@@ -59,6 +114,89 @@ export default function OrderForm({ user }) {
     selectedProduct && quantity
       ? (selectedProduct.sellingPrice * parseInt(quantity)).toFixed(2)
       : "0.00";
+
+  const handlePaymentSubmit = async () => {
+    if (!cardElement || !stripe || !currentOrder) return;
+
+    setPaymentLoading(true);
+
+    try {
+      const { error, paymentIntent } = await stripe.confirmCardPayment(
+        currentOrder.stripeClientSecret,
+        {
+          payment_method: {
+            card: cardElement,
+            billing_details: {
+              email: user.email,
+            },
+          },
+        },
+      );
+
+      if (error) {
+        showToast("error", error.message || "Payment failed");
+        try {
+          await fetch(`${BASE_URL}/orders/${currentOrder.id}/payment-failed`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          });
+        } catch {
+          // silent
+        }
+        setShowPaymentModal(false);
+        setCurrentOrder(null);
+      } else if (paymentIntent.status === "succeeded") {
+        setPaid(true);
+
+        const res = await fetch(
+          `${BASE_URL}/orders/${currentOrder.id}/verify-payment`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              paymentIntentId: paymentIntent.id,
+            }),
+          },
+        );
+
+        const data = await res.json();
+
+        if (res.ok) {
+          showToast("success", "Payment successful! Order confirmed.");
+          setProducts((prev) =>
+            prev.map((p) =>
+              p.id === selectedProduct.id
+                ? {
+                    ...p,
+                    availableQty: p.availableQty - parseInt(quantity),
+                  }
+                : p,
+            ),
+          );
+          setSelectedProduct((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  availableQty: prev.availableQty - parseInt(quantity),
+                }
+              : null,
+          );
+          setQuantity("");
+          setAddress("");
+        } else {
+          showToast("error", data.message || "Payment verification failed");
+        }
+
+        setShowPaymentModal(false);
+        setCurrentOrder(null);
+        setPaid(false);
+      }
+    } catch {
+      showToast("error", "Payment processing failed");
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -89,7 +227,15 @@ export default function OrderForm({ user }) {
 
     setLoading(true);
 
-    // Combine country code and mobile: "+91-9876543210"
+    // Load Stripe first
+    const stripeInstance = await loadStripe();
+    if (!stripeInstance) {
+      showToast("error", "Failed to load payment gateway");
+      setLoading(false);
+      return;
+    }
+    setStripe(stripeInstance);
+
     const fullMobile = `${countryCode}-${mobile.trim()}`;
 
     try {
@@ -108,21 +254,8 @@ export default function OrderForm({ user }) {
       const data = await res.json();
 
       if (res.ok) {
-        showToast("success", "Order placed successfully!");
-        setProducts((prev) =>
-          prev.map((p) =>
-            p.id === selectedProduct.id
-              ? { ...p, availableQty: p.availableQty - parseInt(quantity) }
-              : p,
-          ),
-        );
-        setSelectedProduct((prev) =>
-          prev
-            ? { ...prev, availableQty: prev.availableQty - parseInt(quantity) }
-            : null,
-        );
-        setQuantity("");
-        setAddress("");
+        setCurrentOrder(data);
+        setShowPaymentModal(true);
       } else {
         showToast("error", data.message || "Something went wrong");
       }
@@ -148,6 +281,64 @@ export default function OrderForm({ user }) {
         </div>
       )}
 
+      {/* ===== STRIPE PAYMENT MODAL ===== */}
+      {showPaymentModal && (
+        <div className="payment-modal-overlay">
+          <div className="payment-modal">
+            <div className="payment-modal-header">
+              <div className="payment-modal-icon">💳</div>
+              <h2 className="payment-modal-title">Complete Payment</h2>
+              <p className="payment-modal-subtitle">
+                {selectedProduct?.name} × {quantity}
+              </p>
+              <p className="payment-modal-amount">${calculatedAmount}</p>
+            </div>
+
+            <div className="payment-form">
+              <label className="payment-label">Card Details</label>
+              <div id="stripe-card-element" className="stripe-card-element" />
+
+              <button
+                className={`payment-submit-btn ${paymentLoading ? "loading" : ""}`}
+                onClick={handlePaymentSubmit}
+                disabled={paymentLoading}
+              >
+                {paymentLoading ? (
+                  <span className="spinner" />
+                ) : (
+                  `Pay $${calculatedAmount}`
+                )}
+              </button>
+
+              <button
+                className="payment-cancel-btn"
+                onClick={async () => {
+                  if (paid) return;
+                  try {
+                    await fetch(
+                      `${BASE_URL}/orders/${currentOrder.id}/payment-failed`,
+                      {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                      },
+                    );
+                  } catch {
+                    // silent
+                  }
+                  setShowPaymentModal(false);
+                  setCurrentOrder(null);
+                  showToast("error", "Payment cancelled");
+                }}
+                disabled={paymentLoading}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== ORDER FORM ===== */}
       <form className="order-card" onSubmit={handleSubmit}>
         <div className="card-header">
           <div className="card-icon">
@@ -173,7 +364,6 @@ export default function OrderForm({ user }) {
           </p>
         </div>
 
-        {/* User ID (Read-only) */}
         <div className="form-group">
           <label className="form-label">User</label>
           <div className="input-wrapper">
@@ -201,7 +391,6 @@ export default function OrderForm({ user }) {
           </div>
         </div>
 
-        {/* Product Dropdown */}
         <div className="form-group">
           <label className="form-label">Product</label>
           <div className="input-wrapper">
@@ -236,7 +425,6 @@ export default function OrderForm({ user }) {
           </div>
         </div>
 
-        {/* Product Info */}
         {selectedProduct && (
           <div className="product-info">
             <div className="info-chip">
@@ -256,7 +444,6 @@ export default function OrderForm({ user }) {
           </div>
         )}
 
-        {/* Quantity */}
         <div className="form-group">
           <label className="form-label">Quantity</label>
           <div className="input-wrapper">
@@ -302,7 +489,6 @@ export default function OrderForm({ user }) {
           </div>
         </div>
 
-        {/* Total Amount (Read-only) */}
         <div className="form-group">
           <label className="form-label">Total Amount</label>
           <div className="input-wrapper">
@@ -330,7 +516,6 @@ export default function OrderForm({ user }) {
           </div>
         </div>
 
-        {/* Address */}
         <div className="form-group">
           <label className="form-label">Delivery Address</label>
           <div className="input-wrapper">
@@ -359,7 +544,6 @@ export default function OrderForm({ user }) {
           </div>
         </div>
 
-        {/* Mobile Number with Country Code */}
         <div className="form-group">
           <label className="form-label">Mobile Number</label>
           <div className="phone-input-row">
@@ -407,7 +591,6 @@ export default function OrderForm({ user }) {
           </div>
         </div>
 
-        {/* Submit */}
         <button
           className={`submit-btn ${loading ? "loading" : ""}`}
           type="submit"

@@ -5,12 +5,12 @@ import com.order.service.entities.Order;
 import com.order.service.mapper.OrderRowMapper;
 import com.order.service.queries.OrderQueries;
 import com.order.service.queries.ProductQueries;
+import com.order.service.queries.OutboxQueries;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Mono;
-import com.order.service.queries.OutboxQueries;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
@@ -24,7 +24,9 @@ public class OrderRepositoryImpl implements CustomOrderRepository {
     private final TransactionalOperator txOperator;
     private final RabbitTemplate rabbitTemplate;
 
-    public OrderRepositoryImpl(DatabaseClient databaseClient, TransactionalOperator txOperator, RabbitTemplate rabbitTemplate) {
+    public OrderRepositoryImpl(DatabaseClient databaseClient,
+                               TransactionalOperator txOperator,
+                               RabbitTemplate rabbitTemplate) {
         this.databaseClient = databaseClient;
         this.txOperator = txOperator;
         this.rabbitTemplate = rabbitTemplate;
@@ -43,7 +45,8 @@ public class OrderRepositoryImpl implements CustomOrderRepository {
               "quantity": %d,
               "amount": %s,
               "address": "%s",
-              "mobileNumber": "%s"
+              "mobileNumber": "%s",
+              "stripeClientSecret": "%s"
             }
             """.formatted(
                 order.getId(),
@@ -52,7 +55,8 @@ public class OrderRepositoryImpl implements CustomOrderRepository {
                 order.getQuantity(),
                 order.getAmount(),
                 order.getAddress(),
-                order.getMobileNumber()
+                order.getMobileNumber(),
+                order.getStripeClientSecret()
         );
 
         Mono<Void> txFlow = databaseClient.sql(OrderQueries.INSERT)
@@ -65,22 +69,8 @@ public class OrderRepositoryImpl implements CustomOrderRepository {
                 .bind("status", order.getStatus())
                 .bind("createdAt", order.getCreatedAt())
                 .bind("mobileNumber", order.getMobileNumber())
+                .bind("stripeClientSecret", order.getStripeClientSecret())
                 .then()
-                .then(
-                        databaseClient.sql(ProductQueries.REDUCE_STOCK)
-                                .bind("id", order.getProductId())
-                                .bind("quantity", order.getQuantity())
-                                .fetch()
-                                .rowsUpdated()
-                                .flatMap(rowsUpdated -> {
-                                    if (rowsUpdated == 0) {
-                                        return Mono.error(
-                                                new RuntimeException("Insufficient stock or product not found")
-                                        );
-                                    }
-                                    return Mono.empty();
-                                })
-                )
                 .then(
                         databaseClient.sql(OutboxQueries.INSERT)
                                 .bind("id", eventId)
@@ -92,6 +82,7 @@ public class OrderRepositoryImpl implements CustomOrderRepository {
                                 .bind("createdAt", LocalDateTime.now())
                                 .then()
                 );
+
         return txOperator.transactional(txFlow)
                 .thenReturn(order)
                 .flatMap(savedOrder ->
@@ -122,40 +113,203 @@ public class OrderRepositoryImpl implements CustomOrderRepository {
                 );
     }
 
-    //Test Method to check transaction behaviour
-    public Mono<Order> insertOrderFail(Order order) {
+    @Override
+    public Mono<Order> findById(String orderId) {
+        return databaseClient.sql(OrderQueries.FIND_BY_ID)
+                .bind("id", orderId)
+                .map(mapper::apply)
+                .one();
+    }
+
+    @Override
+    public Mono<Order> confirmPayment(String orderId, String stripePaymentIntentId, String productName) {
 
         UUID eventId = UUID.randomUUID();
 
-        String payload = """
-            {
-              "orderId": "%s",
-              "userId": "%s",
-              "amount": %s
-            }
-            """.formatted(order.getId(), order.getUserId(), order.getAmount());
+        return findById(orderId)
+                .switchIfEmpty(Mono.error(new RuntimeException("Order not found")))
+                .flatMap(order -> {
+                    if (!"PENDING_PAYMENT".equals(order.getStatus()) && !"SENT".equals(order.getStatus())) {
+                        return Mono.error(new RuntimeException("Order already processed"));
+                    }
 
-        Mono<Void> txFlow = databaseClient.sql(OrderQueries.INSERT)
-                .bind("id", order.getId())
-                .bind("userId", order.getUserId())
-                .bind("status", order.getStatus())
-                .bind("amount", order.getAmount())
-                .bind("createdAt", order.getCreatedAt())
-                .then()
+                    String notificationPayload = """
+                        {
+                          "email": "%s",
+                          "type": "ORDER_SUCCESS",
+                          "orderId": "%s",
+                          "productName": "%s",
+                          "quantity": %d,
+                          "amount": "%s",
+                          "address": "%s"
+                        }
+                        """.formatted(
+                            order.getUserId(),
+                            order.getId(),
+                            productName,
+                            order.getQuantity(),
+                            "$" + order.getAmount().toPlainString(),
+                            order.getAddress()
+                    );
 
-                .then(
-                        databaseClient.sql(OutboxQueries.INSERT)
-                                .bind("id", eventId)
-                                .bind("aggregateType", "ORDER")
-                                .bind("aggregateId", order.getId())
-                                .bind("eventType", "ORDER_CREATED")
-                                .bind("payload", payload)
-                                .bind("status", "PENDING")
-                                .bind("createdAt", LocalDateTime.now())
-                                .then()
-                )
-                .then(Mono.defer(() -> Mono.error(new RuntimeException("forced failure"))));
-        return txOperator.transactional(txFlow)
-                .thenReturn(order);
+                    String outboxPayload = """
+                        {
+                          "orderId": "%s",
+                          "userId": "%s",
+                          "status": "CONFIRMED",
+                          "stripePaymentIntentId": "%s"
+                        }
+                        """.formatted(order.getId(), order.getUserId(), stripePaymentIntentId);
+
+                    Mono<Void> txFlow = databaseClient.sql(OrderQueries.UPDATE_PAYMENT_SUCCESS)
+                            .bind("id", orderId)
+                            .bind("stripePaymentIntentId", stripePaymentIntentId)
+                            .fetch()
+                            .rowsUpdated()
+                            .flatMap(rows -> {
+                                if (rows == 0) {
+                                    return Mono.error(new RuntimeException("Order update failed"));
+                                }
+                                return Mono.empty();
+                            })
+                            .then(
+                                    databaseClient.sql(ProductQueries.REDUCE_STOCK)
+                                            .bind("id", order.getProductId())
+                                            .bind("quantity", order.getQuantity())
+                                            .fetch()
+                                            .rowsUpdated()
+                                            .flatMap(rowsUpdated -> {
+                                                if (rowsUpdated == 0) {
+                                                    return Mono.error(
+                                                            new RuntimeException("Insufficient stock or product not found")
+                                                    );
+                                                }
+                                                return Mono.empty();
+                                            })
+                            )
+                            .then(
+                                    databaseClient.sql(OutboxQueries.INSERT)
+                                            .bind("id", eventId)
+                                            .bind("aggregateType", "ORDER")
+                                            .bind("aggregateId", order.getId())
+                                            .bind("eventType", "ORDER_CONFIRMED")
+                                            .bind("payload", outboxPayload)
+                                            .bind("status", "CREATED")
+                                            .bind("createdAt", LocalDateTime.now())
+                                            .then()
+                            );
+
+                    order.setStatus("CONFIRMED");
+                    order.setStripePaymentIntentId(stripePaymentIntentId);
+
+                    return txOperator.transactional(txFlow)
+                            .thenReturn(order)
+                            .flatMap(confirmedOrder ->
+                                    Mono.fromCallable(() -> {
+                                                rabbitTemplate.convertAndSend(
+                                                        RabbitMQConfig.NOTIFICATION_EXCHANGE,
+                                                        RabbitMQConfig.ORDER_NOTIFICATION_ROUTING_KEY,
+                                                        notificationPayload
+                                                );
+                                                return confirmedOrder;
+                                            })
+                                            .subscribeOn(Schedulers.boundedElastic())
+                                            .flatMap(sent ->
+                                                    databaseClient.sql(OutboxQueries.UPDATE_STATUS)
+                                                            .bind("id", eventId)
+                                                            .then()
+                                                            .thenReturn(sent)
+                                            )
+                                            .onErrorResume(ex -> {
+                                                System.err.println("Notification failed -> " + ex.getMessage());
+                                                return Mono.just(confirmedOrder);
+                                            })
+                            );
+                });
+    }
+
+    @Override
+    public Mono<Order> failPayment(String orderId, String productName) {
+
+        UUID eventId = UUID.randomUUID();
+
+        return findById(orderId)
+                .switchIfEmpty(Mono.error(new RuntimeException("Order not found")))
+                .flatMap(order -> {
+                    if (!"PENDING_PAYMENT".equals(order.getStatus()) && !"SENT".equals(order.getStatus())) {
+                        return Mono.just(order);
+                    }
+
+                    String notificationPayload = """
+                        {
+                          "email": "%s",
+                          "type": "ORDER_FAILED",
+                          "orderId": "%s",
+                          "productName": "%s",
+                          "quantity": %d,
+                          "amount": "%s",
+                          "address": "%s"
+                        }
+                        """.formatted(
+                            order.getUserId(),
+                            order.getId(),
+                            productName,
+                            order.getProductId(),
+                            order.getQuantity(),
+                            "$" + order.getAmount().toPlainString(),
+                            order.getAddress()
+                    );
+
+                    String outboxPayload = """
+                        {
+                          "orderId": "%s",
+                          "userId": "%s",
+                          "status": "PAYMENT_FAILED"
+                        }
+                        """.formatted(order.getId(), order.getUserId());
+
+                    Mono<Void> txFlow = databaseClient.sql(OrderQueries.UPDATE_PAYMENT_FAILED)
+                            .bind("id", orderId)
+                            .fetch()
+                            .rowsUpdated()
+                            .then()
+                            .then(
+                                    databaseClient.sql(OutboxQueries.INSERT)
+                                            .bind("id", eventId)
+                                            .bind("aggregateType", "ORDER")
+                                            .bind("aggregateId", order.getId())
+                                            .bind("eventType", "ORDER_PAYMENT_FAILED")
+                                            .bind("payload", outboxPayload)
+                                            .bind("status", "CREATED")
+                                            .bind("createdAt", LocalDateTime.now())
+                                            .then()
+                            );
+
+                    order.setStatus("PAYMENT_FAILED");
+
+                    return txOperator.transactional(txFlow)
+                            .thenReturn(order)
+                            .flatMap(failedOrder ->
+                                    Mono.fromCallable(() -> {
+                                                rabbitTemplate.convertAndSend(
+                                                        RabbitMQConfig.NOTIFICATION_EXCHANGE,
+                                                        RabbitMQConfig.ORDER_NOTIFICATION_ROUTING_KEY,
+                                                        notificationPayload
+                                                );
+                                                return failedOrder;
+                                            })
+                                            .subscribeOn(Schedulers.boundedElastic())
+                                            .flatMap(sent ->
+                                                    databaseClient.sql(OutboxQueries.UPDATE_STATUS)
+                                                            .bind("id", eventId)
+                                                            .then()
+                                                            .thenReturn(sent)
+                                            )
+                                            .onErrorResume(ex -> {
+                                                System.err.println("Notification failed -> " + ex.getMessage());
+                                                return Mono.just(failedOrder);
+                                            })
+                            );
+                });
     }
 }

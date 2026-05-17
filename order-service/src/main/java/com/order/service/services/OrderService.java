@@ -2,10 +2,11 @@ package com.order.service.services;
 
 import com.order.service.dto.OrderRequest;
 import com.order.service.entities.Order;
-import com.order.service.repositories.OrderRepository;
-import com.order.service.repositories.ProductRepository;
+import com.order.service.repositories.CustomOrderRepository;
+import com.order.service.services.ProductCacheService;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import com.order.service.services.StripeService;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -14,17 +15,19 @@ import java.util.UUID;
 @Service
 public class OrderService {
 
-    private final OrderRepository orderRepository;
-    private final ProductRepository productRepository;
+    private final CustomOrderRepository orderRepository;
     private final ProductCacheService productCacheService;
+    private final StripeService stripeService;
 
-    public OrderService(OrderRepository orderRepository, ProductRepository productRepository, ProductCacheService productCacheService){
+    public OrderService(CustomOrderRepository orderRepository,
+                        ProductCacheService productCacheService,
+                        StripeService stripeService) {
         this.orderRepository = orderRepository;
-        this.productRepository = productRepository;
         this.productCacheService = productCacheService;
+        this.stripeService = stripeService;
     }
 
-    public Mono<Order> createOrder(OrderRequest request){
+    public Mono<Order> createOrder(OrderRequest request) {
         return productCacheService.getProductById(request.getProductId())
                 .switchIfEmpty(Mono.error(new RuntimeException("Product not found")))
                 .flatMap(product -> {
@@ -36,6 +39,8 @@ public class OrderService {
                     BigDecimal amount = product.getSellingPrice()
                             .multiply(BigDecimal.valueOf(request.getQuantity()));
 
+                    String clientSecret = stripeService.createPaymentIntent(amount);
+
                     Order order = new Order();
                     order.setId(String.valueOf(UUID.randomUUID()));
                     order.setUserId(request.getUserId());
@@ -43,17 +48,48 @@ public class OrderService {
                     order.setQuantity(request.getQuantity());
                     order.setAmount(amount);
                     order.setAddress(request.getAddress());
-                    order.setStatus("CREATED");
+                    order.setStatus("PENDING_PAYMENT");
                     order.setCreatedAt(LocalDateTime.now());
                     order.setMobileNumber(request.getMobileNumber());
+                    order.setStripeClientSecret(clientSecret);
 
-                    return orderRepository.insertOrder(order)
-                            // Evict cache after order placed (stock changed)
-                            .flatMap(savedOrder ->
-                                    productCacheService.evictProductCache(request.getProductId())
-                                            .thenReturn(savedOrder)
-                            );
+                    return orderRepository.insertOrder(order);
                 });
     }
 
+    public Mono<Order> verifyPaymentAndConfirm(String orderId, String paymentIntentId) {
+        boolean isValid = stripeService.verifyPaymentIntent(paymentIntentId);
+
+        if (!isValid) {
+            return Mono.error(new RuntimeException("Payment not completed"));
+        }
+
+        return orderRepository.findById(orderId)
+                .switchIfEmpty(Mono.error(new RuntimeException("Order not found")))
+                .flatMap(order ->
+                        productCacheService.getProductById(order.getProductId())
+                                .map(product -> product.getName())
+                                .defaultIfEmpty("Unknown Product")
+                                .flatMap(productName ->
+                                        orderRepository.confirmPayment(orderId, paymentIntentId, productName)
+                                )
+                                .flatMap(confirmedOrder ->
+                                        productCacheService.evictProductCache(confirmedOrder.getProductId())
+                                                .thenReturn(confirmedOrder)
+                                )
+                );
+    }
+
+    public Mono<Order> handlePaymentFailure(String orderId) {
+        return orderRepository.findById(orderId)
+                .switchIfEmpty(Mono.error(new RuntimeException("Order not found")))
+                .flatMap(order ->
+                        productCacheService.getProductById(order.getProductId())
+                                .map(product -> product.getName())
+                                .defaultIfEmpty("Unknown Product")
+                                .flatMap(productName ->
+                                        orderRepository.failPayment(orderId, productName)
+                                )
+                );
+    }
 }

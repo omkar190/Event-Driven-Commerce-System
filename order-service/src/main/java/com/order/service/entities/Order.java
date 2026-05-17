@@ -36,4 +36,7 @@ public class Order {
     private String mobileNumber;
 
     private LocalDateTime createdAt;
+
+    private String stripeClientSecret;
+    private String stripePaymentIntentId;
 }

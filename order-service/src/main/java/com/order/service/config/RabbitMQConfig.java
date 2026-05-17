@@ -17,6 +17,8 @@ public class RabbitMQConfig {
     public static final String NOTIFICATION_EXCHANGE = "notification.exchange";
     public static final String NOTIFICATION_ROUTING_KEY = "notification.otp";
 
+    public static final String ORDER_NOTIFICATION_ROUTING_KEY = "notification.order";
+
     @Bean
     public DirectExchange orderExchange() {
         return new DirectExchange(ORDER_EXCHANGE, true, false);

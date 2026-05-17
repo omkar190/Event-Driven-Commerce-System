@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS order_schema.orders (
     address TEXT,
     mobile_number VARCHAR(15),
     status VARCHAR(50),
-    created_at TIMESTAMP
+    created_at TIMESTAMP,
+    stripe_client_secret VARCHAR(200),
+    stripe_payment_intent_id VARCHAR(100)
 );
 
 CREATE TABLE IF NOT EXISTS order_schema.order_outbox_event (

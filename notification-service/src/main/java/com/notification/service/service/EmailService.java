@@ -1,5 +1,6 @@
 package com.notification.service.service;
 
+import com.notification.service.dto.OrderNotificationEvent;
 import com.notification.service.dto.OtpNotificationEvent;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -32,7 +33,7 @@ public class EmailService {
                 ? "Verify your account - OTP"
                 : "Your login OTP";
 
-        String htmlBody = buildEmailBody(event);
+        String htmlBody = buildOtpEmailBody(event);
 
         Map<String, Object> payload = Map.of(
                 "from", fromEmail,
@@ -50,13 +51,44 @@ public class EmailService {
                     .retrieve()
                     .body(String.class);
 
-            System.out.println("Email sent successfully: " + response);
+            System.out.println("OTP email sent successfully: " + response);
         } catch (Exception e) {
-            System.err.println("Email send failed: " + e.getMessage());
+            System.err.println("OTP email send failed: " + e.getMessage());
         }
     }
 
-    private String buildEmailBody(OtpNotificationEvent event) {
+    public void sendOrderEmail(OrderNotificationEvent event) {
+        boolean isSuccess = "ORDER_SUCCESS".equals(event.getType());
+
+        String subject = isSuccess
+                ? "Order Confirmed - " + event.getOrderId()
+                : "Order Failed - " + event.getOrderId();
+
+        String htmlBody = buildOrderEmailBody(event, isSuccess);
+
+        Map<String, Object> payload = Map.of(
+                "from", fromEmail,
+                "to", List.of(event.getEmail()),
+                "subject", subject,
+                "html", htmlBody
+        );
+
+        try {
+            String response = restClient.post()
+                    .uri("/emails")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + resendApiKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(payload)
+                    .retrieve()
+                    .body(String.class);
+
+            System.out.println("Order email sent successfully: " + response);
+        } catch (Exception e) {
+            System.err.println("Order email send failed: " + e.getMessage());
+        }
+    }
+
+    private String buildOtpEmailBody(OtpNotificationEvent event) {
         String action = event.getType().equals("SIGNUP")
                 ? "verify your account"
                 : "login to your account";
@@ -90,5 +122,73 @@ public class EmailService {
                 </body>
                 </html>
                 """.formatted(action, event.getOtp());
+    }
+
+    private String buildOrderEmailBody(OrderNotificationEvent event, boolean isSuccess) {
+        String statusColor = isSuccess ? "#22c55e" : "#ef4444";
+        String statusIcon = isSuccess ? "✅" : "❌";
+        String statusText = isSuccess ? "Order Confirmed" : "Payment Failed";
+        String message = isSuccess
+                ? "Your payment was successful and your order has been confirmed."
+                : "Unfortunately, your payment could not be processed. No amount has been charged.";
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+                        .container { max-width: 500px; margin: 40px auto; background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+                        .header { text-align: center; margin-bottom: 20px; }
+                        .status-badge { background: %s; color: white; padding: 12px 24px; border-radius: 8px; font-size: 18px; font-weight: bold; text-align: center; margin: 20px 0; }
+                        .details { background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; }
+                        .detail-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb; }
+                        .detail-row:last-child { border-bottom: none; }
+                        .detail-label { color: #6b7280; font-size: 14px; }
+                        .detail-value { font-weight: bold; font-size: 14px; }
+                        .message { text-align: center; color: #555; margin: 20px 0; }
+                        .footer { text-align: center; color: #888; font-size: 12px; margin-top: 30px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h2>🛒 Order Service</h2>
+                        </div>
+                        <div class="status-badge">%s %s</div>
+                        <p class="message">%s</p>
+                        <div class="details">
+                            <div class="detail-row">
+                                <span class="detail-label">Order ID&nbsp;:&nbsp;</span>
+                                <span class="detail-value">%s</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Product&nbsp;:&nbsp;</span>
+                                <span class="detail-value">%s</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Quantity&nbsp;:&nbsp;</span>
+                                <span class="detail-value">%d</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Amount&nbsp;:&nbsp;</span>
+                                <span class="detail-value">%s</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Delivery Address&nbsp;:&nbsp;</span>
+                                <span class="detail-value">%s</span>
+                            </div>
+                        </div>
+                        <div class="footer">
+                            <p>© 2024 Order Service. All rights reserved.</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """.formatted(
+                statusColor, statusIcon, statusText, message,
+                 event.getOrderId(), event.getProductName(),
+                event.getQuantity(), event.getAmount(), event.getAddress()
+        );
     }
 }

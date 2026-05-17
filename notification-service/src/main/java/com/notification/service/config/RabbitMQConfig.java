@@ -13,14 +13,19 @@ import org.springframework.context.annotation.Configuration;
 public class RabbitMQConfig {
 
     public static final String NOTIFICATION_EXCHANGE = "notification.exchange";
+
     public static final String NOTIFICATION_QUEUE = "notification.queue";
     public static final String NOTIFICATION_ROUTING_KEY = "notification.otp";
+
+    public static final String ORDER_NOTIFICATION_QUEUE = "notification.order.queue";
+    public static final String ORDER_NOTIFICATION_ROUTING_KEY = "notification.order";
 
     @Bean
     public DirectExchange notificationExchange() {
         return new DirectExchange(NOTIFICATION_EXCHANGE, true, false);
     }
 
+    // OTP queue
     @Bean
     public Queue notificationQueue() {
         return QueueBuilder.durable(NOTIFICATION_QUEUE).build();
@@ -33,6 +38,20 @@ public class RabbitMQConfig {
                 .bind(notificationQueue)
                 .to(notificationExchange)
                 .with(NOTIFICATION_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue orderNotificationQueue() {
+        return QueueBuilder.durable(ORDER_NOTIFICATION_QUEUE).build();
+    }
+
+    @Bean
+    public Binding orderNotificationBinding(Queue orderNotificationQueue,
+                                            DirectExchange notificationExchange) {
+        return BindingBuilder
+                .bind(orderNotificationQueue)
+                .to(notificationExchange)
+                .with(ORDER_NOTIFICATION_ROUTING_KEY);
     }
 
     @Bean
