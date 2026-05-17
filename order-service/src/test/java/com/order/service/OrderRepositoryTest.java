@@ -57,6 +57,7 @@ class OrderRepositoryTest {
         order.setMobileNumber("+91-9876543210");
         order.setStatus("PENDING");
         order.setCreatedAt(LocalDateTime.now());
+        order.setStripeClientSecret("test_client_secret");
         return order;
     }
 
