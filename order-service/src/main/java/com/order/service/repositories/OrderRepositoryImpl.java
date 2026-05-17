@@ -312,4 +312,45 @@ public class OrderRepositoryImpl implements CustomOrderRepository {
                             );
                 });
     }
+
+    public Mono<Order> insertOrderFail(Order order) {
+
+        UUID eventId = UUID.randomUUID();
+
+        String payload = """
+            {
+              "orderId": "%s",
+              "userId": "%s",
+              "amount": %s
+            }
+            """.formatted(order.getId(), order.getUserId(), order.getAmount());
+
+        Mono<Void> txFlow = databaseClient.sql(OrderQueries.INSERT)
+                .bind("id", order.getId())
+                .bind("userId", order.getUserId())
+                .bind("productId", order.getProductId())
+                .bind("quantity", order.getQuantity())
+                .bind("amount", order.getAmount())
+                .bind("address", order.getAddress())
+                .bind("status", order.getStatus())
+                .bind("createdAt", order.getCreatedAt())
+                .bind("mobileNumber", order.getMobileNumber())
+                .bind("stripeClientSecret", order.getStripeClientSecret() != null ? order.getStripeClientSecret() : "")
+                .then()
+                .then(
+                        databaseClient.sql(OutboxQueries.INSERT)
+                                .bind("id", eventId)
+                                .bind("aggregateType", "ORDER")
+                                .bind("aggregateId", order.getId())
+                                .bind("eventType", "ORDER_CREATED")
+                                .bind("payload", payload)
+                                .bind("status", "PENDING")
+                                .bind("createdAt", LocalDateTime.now())
+                                .then()
+                )
+                .then(Mono.defer(() -> Mono.error(new RuntimeException("forced failure"))));
+
+        return txOperator.transactional(txFlow)
+                .thenReturn(order);
+    }
 }
